@@ -11,7 +11,7 @@ workflows:
         - 'nixbuild/nix-quick-install-action@v35'
     '.github/workflows/dependabot-auto-merge.yaml':
         - 'dependabot/fetch-metadata@v3.1.0'
-    '.github/workflows/dependabot-sync-goda.yaml':
+    '.github/workflows/dependabot-sync-go-mod.yaml':
         - 'actions/checkout@v7.0.1'
         - 'actions/create-github-app-token@v3.3.0'
         - 'nix-community/cache-nix-action@v7.0.2'

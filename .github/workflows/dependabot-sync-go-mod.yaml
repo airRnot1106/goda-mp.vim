@@ -1,4 +1,4 @@
-name: Dependabot sync goda.vim
+name: Dependabot sync go.mod
 
 on: pull_request
 
@@ -8,6 +8,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  PACKAGE: goda-mp
 
 jobs:
   sync:
@@ -19,31 +22,48 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           persist-credentials: false
-      - id: pin
+      - id: stale
+        shell: bash
         run: |
-          rev=$(jq -r '.nodes["goda-vim"].locked.rev' flake.lock)
-          if grep -qE "github.com/Shougo/goda.vim v[^ ]*-${rev:0:12}( |\$)" go.mod; then
-            echo 'go.mod already matches flake.lock.'
-          else
-            echo "rev=$rev" >>"$GITHUB_OUTPUT"
-          fi
-      - if: steps.pin.outputs.rev
+          modules=()
+          while IFS=$'\t' read -r module version; do
+            grep -qF "$module " go.mod || continue
+            if [[ $version == v* ]]; then
+              pinned=$version
+            else
+              pinned="v[^ ]*-${version:0:12}"
+            fi
+            grep -qE "$module $pinned( |\$)" go.mod || modules+=("$module@$version")
+          done < <(jq -r '
+            .nodes as $nodes
+            | $nodes.root.inputs[]
+            | strings
+            | $nodes[.]
+            | select(.locked.type == "github")
+            | ["github.com/\(.locked.owner)/\(.locked.repo)",
+               ((.original.ref // "" | select(test("^v[0-9]"))) // .locked.rev)]
+            | @tsv
+          ' flake.lock)
+          echo "modules=${modules[*]}" >>"$GITHUB_OUTPUT"
+      - if: steps.stale.outputs.modules
         uses: nixbuild/nix-quick-install-action@v35
-      - if: steps.pin.outputs.rev
+      - if: steps.stale.outputs.modules
         uses: nix-community/cache-nix-action@v7.0.2
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
           save: false
-      - if: steps.pin.outputs.rev
+      - if: steps.stale.outputs.modules
+        shell: bash
         run: |
-          nix shell --inputs-from . nixpkgs#go_1_26 -c go get "github.com/Shougo/goda.vim@$REV"
+          read -ra modules <<<"$MODULES"
+          nix shell --inputs-from . nixpkgs#go_1_26 -c go get "${modules[@]}"
           nix shell --inputs-from . nixpkgs#go_1_26 -c go mod tidy
-          nix run --inputs-from . nixpkgs#nix-update -- --flake goda-mp --version=skip
+          nix run --inputs-from . nixpkgs#nix-update -- --flake "$PACKAGE" --version=skip
         env:
-          REV: ${{ steps.pin.outputs.rev }}
+          MODULES: ${{ steps.stale.outputs.modules }}
       # A push with GITHUB_TOKEN starts no workflow run, so CI would not see the new commit.
-      - if: steps.pin.outputs.rev
+      - if: steps.stale.outputs.modules
         id: app-token
         uses: actions/create-github-app-token@v3.3.0
         with:
@@ -51,7 +71,7 @@ jobs:
           private-key: ${{ secrets.CI_BOT_PRIVATE_KEY }}
           permission-contents: write
       # Commits created through the API are signed by GitHub.
-      - if: steps.pin.outputs.rev
+      - if: steps.stale.outputs.modules
         shell: bash
         run: |
           parent=$(git rev-parse HEAD)
@@ -63,15 +83,15 @@ jobs:
             entries=$(jq -c --arg path "$path" --arg sha "$blob" \
               '. + [{path: $path, mode: "100644", type: "blob", sha: $sha}]' <<<"$entries")
           done < <(git diff --name-only -- go.mod go.sum flake.nix)
+          [ "$entries" != '[]' ] || exit 0
           tree=$(jq -n --arg base "$base_tree" --argjson tree "$entries" \
             '{base_tree: $base, tree: $tree}' |
             gh api "repos/$REPO/git/trees" --input - --jq .sha)
           commit=$(gh api "repos/$REPO/git/commits" \
-            -f "message=build(deps): bump goda.vim in go.mod to ${REV:0:7}" \
+            -f 'message=build(deps): sync go.mod with flake.lock' \
             -f "tree=$tree" -f "parents[]=$parent" --jq .sha)
           gh api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH" -f "sha=$commit"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
-          REV: ${{ steps.pin.outputs.rev }}
