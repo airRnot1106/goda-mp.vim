@@ -43,7 +43,7 @@
           pname = "goda-mp";
           inherit version;
           src = ./.;
-          vendorHash = "sha256-YaflM80d4knBldJdqNpmYF8k9vOAW4JtSG6WIVs3hY8=";
+          vendorHash = "sha256-TD1Vfl0IXidJDOOHnbeaEi24uJQNc/CbKc5P6fNs1/4=";
           subPackages = [ "." ];
           doCheck = false;
           preBuild = ''
