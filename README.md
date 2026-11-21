@@ -140,7 +140,7 @@ go test ./...
 nix flake check
 ```
 
-Running `nix flake check` will run the Go tests, E2E tests against actual Vim and Neovim instances, and make sure `go.mod` stays in sync with the `goda-vim` flake input. Keep in mind that Nix flakes ignore untracked files, so remember to `git add` any new files before testing or building.
+Running `nix flake check` will run the Go tests and E2E tests against actual Vim and Neovim instances. The Vim side of goda.vim comes from the version in `go.mod`. Keep in mind that Nix flakes ignore untracked files, so remember to `git add` any new files before testing or building.
 
 ## Special thanks
 
