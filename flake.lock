@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795237508,
-        "narHash": "sha256-8+G4iivHlZGbSHLPEtuulCXndZaVaF4pVQTcd4Arry4=",
+        "lastModified": 1795239927,
+        "narHash": "sha256-Ijhf1wye133IpbaMwGuwg9V+tprCpZpRhr+bPyCwPMU=",
         "owner": "airRnot1106",
         "repo": "goda.nix",
-        "rev": "bcde001212420b7694ea5d53a5fcf33a57a2865f",
+        "rev": "18e0bed025fbe3202db6a756b775b039b342c733",
         "type": "github"
       },
       "original": {

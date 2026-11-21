@@ -10,22 +10,20 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      goda-nix,
-    }:
+    { nixpkgs, goda-nix, ... }:
     let
-      systems = [
-        "aarch64-darwin"
-        "x86_64-darwin"
-        "aarch64-linux"
-        "x86_64-linux"
-      ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
       version = "0.1.0";
 
-      mkPackages = pkgs: rec {
+      forAllSystems =
+        f:
+        nixpkgs.lib.genAttrs [
+          "aarch64-darwin"
+          "x86_64-darwin"
+          "aarch64-linux"
+          "x86_64-linux"
+        ] (system: f nixpkgs.legacyPackages.${system});
+
+      build = pkgs: rec {
         client = pkgs.buildNpmPackage {
           pname = "goda-mp-client";
           inherit version;
@@ -50,122 +48,95 @@
           '';
         };
 
-        goda-mp = plugin.binary;
-
-        goda-vim-of-go-mod = pkgs.runCommand "goda.vim-source" { nativeBuildInputs = [ goda-mp.go ]; } ''
-          export GOPROXY=file://${goda-mp.goModules} GOSUMDB=off GOTOOLCHAIN=local
-          export HOME=$TMPDIR GOPATH=$TMPDIR/go
-          # The go command ignores a go.mod in the system temp root, which the
-          # build directory is.
-          mkdir module && cd module
-          cp ${./go.mod} go.mod
-          cp ${./go.sum} go.sum
-          go mod download github.com/Shougo/goda.vim
-          cp -r "$(go list -m -f '{{.Dir}}' github.com/Shougo/goda.vim)" $out
-          chmod -R u+w $out
-        '';
-
-        goda-vim-plugin = pkgs.vimUtils.buildVimPlugin {
-          pname = "goda.vim";
-          version = "gomod";
-          src = goda-vim-of-go-mod;
-        };
-
-        vim-plugin = plugin.overrideAttrs { dependencies = [ goda-vim-plugin ]; };
-
-        default = vim-plugin;
-      };
-
-      mkDemo =
-        pkgs: editor:
-        let
-          built = mkPackages pkgs;
-          init = pkgs.writeText "goda-mp-demo.vim" ''
-            set runtimepath^=${built.goda-vim-plugin},${built.vim-plugin}
-            autocmd VimEnter * PreviewMarkdown
-          '';
-          script = pkgs.writeShellApplication {
-            name = "goda-mp-demo";
-            text = ''
-              dir=$(mktemp -d)
-              trap 'rm -rf "$dir"' EXIT
-              cp ${./demo}/* "$dir"
-              chmod -R u+w "$dir"
-              for i in $(seq 1 50); do
-                printf '\n## Section %s\n\nScroll target %s.\n' "$i" "$i" >> "$dir/sample.md"
-              done
-              ${pkgs.lib.getExe editor} --clean --cmd 'source ${init}' "$@" "$dir/sample.md"
+        goTest =
+          name: nativeBuildInputs: command:
+          plugin.binary.overrideAttrs (prev: {
+            name = "goda-mp-${name}";
+            doCheck = true;
+            nativeBuildInputs = prev.nativeBuildInputs ++ nativeBuildInputs;
+            __darwinAllowLocalNetworking = true;
+            checkPhase = ''
+              runHook preCheck
+              export HOME=$TMPDIR
+              ${command}
+              runHook postCheck
             '';
+            installPhase = "touch $out";
+          });
+
+        demo =
+          editor:
+          let
+            init = pkgs.writeText "goda-mp-demo.vim" ''
+              set runtimepath^=${plugin.godaVim},${plugin}
+              autocmd VimEnter * PreviewMarkdown
+            '';
+            script = pkgs.writeShellApplication {
+              name = "goda-mp-demo";
+              text = ''
+                dir=$(mktemp -d)
+                trap 'rm -rf "$dir"' EXIT
+                cp ${./demo}/* "$dir"
+                chmod -R u+w "$dir"
+                for i in $(seq 1 50); do
+                  printf '\n## Section %s\n\nScroll target %s.\n' "$i" "$i" >> "$dir/sample.md"
+                done
+                ${pkgs.lib.getExe editor} --clean --cmd 'source ${init}' "$@" "$dir/sample.md"
+              '';
+            };
+          in
+          {
+            type = "app";
+            program = pkgs.lib.getExe script;
+            meta.description = "Open a sample Markdown file in ${editor.pname} with only goda-mp.vim and goda.vim";
           };
-        in
-        {
-          type = "app";
-          program = pkgs.lib.getExe script;
-          meta.description = "Open a sample Markdown file in ${editor.pname} with only goda-mp.vim and goda.vim";
-        };
+      };
     in
     {
-      apps = forAllSystems (pkgs: rec {
-        default = neovim;
-        neovim = mkDemo pkgs pkgs.neovim;
-        vim = mkDemo pkgs pkgs.vim;
-      });
-
       packages = forAllSystems (
         pkgs:
         let
-          built = mkPackages pkgs;
+          inherit (build pkgs) client plugin;
         in
         {
-          inherit (built)
-            client
-            goda-mp
-            vim-plugin
-            default
-            ;
-          goda-vim = built.goda-vim-plugin;
+          inherit client;
+          default = plugin;
+          vim-plugin = plugin;
+          goda-mp = plugin.binary;
+          goda-vim = plugin.godaVim;
+        }
+      );
+
+      apps = forAllSystems (
+        pkgs:
+        let
+          inherit (build pkgs) demo;
+        in
+        {
+          default = demo pkgs.neovim;
+          neovim = demo pkgs.neovim;
+          vim = demo pkgs.vim;
         }
       );
 
       checks = forAllSystems (
         pkgs:
         let
-          built = mkPackages pkgs;
-          goTest =
-            name: command:
-            built.goda-mp.overrideAttrs {
-              pname = "goda-mp-${name}";
-              doCheck = true;
-              __darwinAllowLocalNetworking = true;
-              checkPhase = ''
-                runHook preCheck
-                ${command}
-                runHook postCheck
-              '';
-              installPhase = "touch $out";
-              postInstall = "";
-            };
+          inherit (build pkgs) goTest;
         in
         {
-          unit = goTest "unit" "go test ./internal/...";
-          e2e = goTest "e2e" ''
-            export HOME=$TMPDIR
-            export PATH=${
-              pkgs.lib.makeBinPath [
-                pkgs.vim
-                pkgs.neovim
-              ]
-            }:$PATH
-            export GODA_MP_E2E_STRICT=1
-            go test -v -count=1 ./e2e
-          '';
+          unit = goTest "unit" [ ] "go test ./internal/...";
+          e2e = goTest "e2e" [
+            pkgs.vim
+            pkgs.neovim
+          ] "GODA_MP_E2E_STRICT=1 go test -v -count=1 ./e2e";
         }
       );
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
-            pkgs.go_1_26
+            (build pkgs).plugin.binary.go
             pkgs.nodejs
             pkgs.vim
             pkgs.neovim
