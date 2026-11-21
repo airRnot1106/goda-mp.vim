@@ -6,6 +6,9 @@ Markdown preview for Vim and Neovim, right in your browser.
 
 goda-mp.vim is a port of [bufpreview.vim](https://github.com/kat0h/bufpreview.vim) from [denops.vim](https://github.com/vim-denops/denops.vim) to [goda.vim](https://github.com/Shougo/goda.vim). It replaces Deno with a Go binary that bundles the preview page and its assets directly, so you can preview files without network access.
 
+> [!WARNING]
+> This project is under active development and is not yet stable. The API may change without notice.
+
 ## Features
 
 - Works in Vim and Neovim
