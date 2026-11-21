@@ -3,17 +3,12 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    goda-vim = {
-      url = "github:Shougo/goda.vim";
-      flake = false;
-    };
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      goda-vim,
     }:
     let
       systems = [
@@ -43,7 +38,8 @@
           pname = "goda-mp";
           inherit version;
           src = ./.;
-          vendorHash = "sha256-TD1Vfl0IXidJDOOHnbeaEi24uJQNc/CbKc5P6fNs1/4=";
+          vendorHash = "sha256-v1b+wpIvsBIoZhvrzFDAZHTkAxhpJT4RxeQPGBV8o9I=";
+          proxyVendor = true;
           subPackages = [ "." ];
           doCheck = false;
           preBuild = ''
@@ -57,10 +53,23 @@
           meta.mainProgram = "goda-mp";
         };
 
+        goda-vim-of-go-mod = pkgs.runCommand "goda.vim-source" { nativeBuildInputs = [ goda-mp.go ]; } ''
+          export GOPROXY=file://${goda-mp.goModules} GOSUMDB=off GOTOOLCHAIN=local
+          export HOME=$TMPDIR GOPATH=$TMPDIR/go
+          # The go command ignores a go.mod in the system temp root, which the
+          # build directory is.
+          mkdir module && cd module
+          cp ${./go.mod} go.mod
+          cp ${./go.sum} go.sum
+          go mod download github.com/Shougo/goda.vim
+          cp -r "$(go list -m -f '{{.Dir}}' github.com/Shougo/goda.vim)" $out
+          chmod -R u+w $out
+        '';
+
         goda-vim-plugin = pkgs.vimUtils.buildVimPlugin {
           pname = "goda.vim";
-          version = "0-${goda-vim.shortRev}";
-          src = goda-vim;
+          version = "gomod";
+          src = goda-vim-of-go-mod;
         };
 
         vim-plugin = pkgs.vimUtils.buildVimPlugin {
@@ -165,13 +174,8 @@
                 pkgs.neovim
               ]
             }:$PATH
-            export GODA_MP_E2E_GODA=${goda-vim}
             export GODA_MP_E2E_STRICT=1
             go test -v -count=1 ./e2e
-          '';
-          goda-pin = pkgs.runCommand "goda-mp-goda-pin" { } ''
-            grep -E 'github.com/Shougo/goda.vim v[^ ]*-${builtins.substring 0 12 goda-vim.rev}( |$)' ${./go.mod}
-            touch $out
           '';
         }
       );
