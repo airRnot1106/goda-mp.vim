@@ -7,14 +7,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1795234394,
-        "narHash": "sha256-glgkuwIuBR4vJewGczC4DVQ8QhfA7Ko8JowuO/62orY=",
-        "path": "/Users/airrnot/dev/github.com/airRnot1106/goda.nix",
-        "type": "path"
+        "lastModified": 1795237508,
+        "narHash": "sha256-8+G4iivHlZGbSHLPEtuulCXndZaVaF4pVQTcd4Arry4=",
+        "owner": "airRnot1106",
+        "repo": "goda.nix",
+        "rev": "bcde001212420b7694ea5d53a5fcf33a57a2865f",
+        "type": "github"
       },
       "original": {
-        "path": "/Users/airrnot/dev/github.com/airRnot1106/goda.nix",
-        "type": "path"
+        "owner": "airRnot1106",
+        "repo": "goda.nix",
+        "type": "github"
       }
     },
     "nixpkgs": {

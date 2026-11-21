@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     goda-nix = {
-      url = "path:/Users/airrnot/dev/github.com/airRnot1106/goda.nix";
+      url = "github:airRnot1106/goda.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -39,7 +39,7 @@
           '';
         };
 
-        vim-plugin = goda-nix.lib.buildGodaPlugin pkgs {
+        plugin = goda-nix.lib.buildGodaPlugin pkgs {
           inherit version;
           src = ./.;
           vendorHash = "sha256-v1b+wpIvsBIoZhvrzFDAZHTkAxhpJT4RxeQPGBV8o9I=";
@@ -50,7 +50,7 @@
           '';
         };
 
-        goda-mp = vim-plugin.binary;
+        goda-mp = plugin.binary;
 
         goda-vim-of-go-mod = pkgs.runCommand "goda.vim-source" { nativeBuildInputs = [ goda-mp.go ]; } ''
           export GOPROXY=file://${goda-mp.goModules} GOSUMDB=off GOTOOLCHAIN=local
@@ -70,6 +70,8 @@
           version = "gomod";
           src = goda-vim-of-go-mod;
         };
+
+        vim-plugin = plugin.overrideAttrs { dependencies = [ goda-vim-plugin ]; };
 
         default = vim-plugin;
       };
