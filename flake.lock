@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "goda-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795234394,
+        "narHash": "sha256-glgkuwIuBR4vJewGczC4DVQ8QhfA7Ko8JowuO/62orY=",
+        "path": "/Users/airrnot/dev/github.com/airRnot1106/goda.nix",
+        "type": "path"
+      },
+      "original": {
+        "path": "/Users/airrnot/dev/github.com/airRnot1106/goda.nix",
+        "type": "path"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1794495034,
@@ -18,6 +35,7 @@
     },
     "root": {
       "inputs": {
+        "goda-nix": "goda-nix",
         "nixpkgs": "nixpkgs"
       }
     }

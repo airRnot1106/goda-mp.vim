@@ -3,12 +3,17 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    goda-nix = {
+      url = "path:/Users/airrnot/dev/github.com/airRnot1106/goda.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
     {
       self,
       nixpkgs,
+      goda-nix,
     }:
     let
       systems = [
@@ -34,24 +39,18 @@
           '';
         };
 
-        goda-mp = pkgs.buildGo126Module {
-          pname = "goda-mp";
+        vim-plugin = goda-nix.lib.buildGodaPlugin pkgs {
           inherit version;
           src = ./.;
           vendorHash = "sha256-v1b+wpIvsBIoZhvrzFDAZHTkAxhpJT4RxeQPGBV8o9I=";
-          proxyVendor = true;
-          subPackages = [ "." ];
-          doCheck = false;
           preBuild = ''
             rm -rf client/dist
             cp -r ${client} client/dist
             chmod -R u+w client/dist
           '';
-          postInstall = ''
-            mv $out/bin/goda-mp.vim $out/bin/goda-mp
-          '';
-          meta.mainProgram = "goda-mp";
         };
+
+        goda-mp = vim-plugin.binary;
 
         goda-vim-of-go-mod = pkgs.runCommand "goda.vim-source" { nativeBuildInputs = [ goda-mp.go ]; } ''
           export GOPROXY=file://${goda-mp.goModules} GOSUMDB=off GOTOOLCHAIN=local
@@ -70,25 +69,6 @@
           pname = "goda.vim";
           version = "gomod";
           src = goda-vim-of-go-mod;
-        };
-
-        vim-plugin = pkgs.vimUtils.buildVimPlugin {
-          pname = "goda-mp.vim";
-          inherit version;
-          src = pkgs.lib.fileset.toSource {
-            root = ./.;
-            fileset = pkgs.lib.fileset.unions [
-              ./LICENSE
-              ./autoload
-              ./doc
-              ./ftplugin
-            ];
-          };
-          dependencies = [ goda-vim-plugin ];
-          preInstall = ''
-            mkdir bin
-            cp ${goda-mp}/bin/goda-mp bin/goda-mp
-          '';
         };
 
         default = vim-plugin;
